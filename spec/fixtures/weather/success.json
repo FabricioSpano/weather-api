@@ -1,0 +1,53 @@
+{
+  "latitude": 51.51147,
+  "longitude": -0.13078308,
+  "generationtime_ms": 0.12385845184326172,
+  "utc_offset_seconds": 0,
+  "timezone": "Europe/London",
+  "timezone_abbreviation": "GMT",
+  "elevation": 4.0,
+  "current_units": {
+    "time": "unixtime",
+    "interval": "seconds",
+    "temperature_2m": "°C"
+  },
+  "current": {
+    "time": 1793324700,
+    "interval": 900,
+    "temperature_2m": 11.5
+  },
+  "daily_units": {
+    "time": "unixtime",
+    "temperature_2m_min": "°C",
+    "temperature_2m_max": "°C"
+  },
+  "daily": {
+    "time": [
+      1793318400,
+      1793404800,
+      1793491200,
+      1793577600,
+      1793664000,
+      1793750400,
+      1793836800
+    ],
+    "temperature_2m_min": [
+      10.5,
+      10.0,
+      8.3,
+      8.3,
+      8.7,
+      8.1,
+      8.2
+    ],
+    "temperature_2m_max": [
+      15.3,
+      15.1,
+      11.2,
+      12.5,
+      13.5,
+      11.6,
+      11.2
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "R",
+        "osm_id": 1181618,
+        "osm_key": "place",
+        "osm_value": "city",
+        "type": "city",
+        "name": "Springfield",
+        "city": "Springfield",
+        "county": "Hampden",
+        "state": "Massachusetts",
+        "country": "United States",
+        "countrycode": "US",
+        "extra": {
+          "admin_level": "8"
+        },
+        "extent": [
+          -72.6221576,
+          42.1622195,
+          -72.471087,
+          42.0637364
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.5886727,
+          42.1018764
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "R",
+        "osm_id": 126326,
+        "osm_key": "place",
+        "osm_value": "city",
+        "type": "city",
+        "name": "Springfield",
+        "county": "Sangamon",
+        "state": "Illinois",
+        "country": "United States",
+        "countrycode": "US",
+        "extra": {
+          "admin_level": "8"
+        },
+        "extent": [
+          -89.773182,
+          39.87417,
+          -89.56851,
+          39.653656
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -89.6439575,
+          39.7990175
+        ]
+      }
+    }
+  ]
+}

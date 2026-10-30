@@ -1,0 +1,39 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "R",
+        "osm_id": 1879842,
+        "osm_key": "office",
+        "osm_value": "government",
+        "type": "house",
+        "housenumber": "10",
+        "name": "10 Downing Street",
+        "street": "Downing Street",
+        "locality": "Westminster",
+        "district": "Covent Garden",
+        "city": "Westminster",
+        "county": "Greater London",
+        "state": "England",
+        "country": "United Kingdom",
+        "postcode": "SW1A 2AA",
+        "countrycode": "GB",
+        "extent": [
+          -0.1277991,
+          51.5036913,
+          -0.1273088,
+          51.5033074
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1276965,
+          51.5034878
+        ]
+      }
+    }
+  ]
+}

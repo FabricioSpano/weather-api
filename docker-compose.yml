@@ -1,0 +1,17 @@
+services:
+  web:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/rails
+    ports:
+      - "3000:3000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lfu", "--save", "", "--appendonly", "no"]
