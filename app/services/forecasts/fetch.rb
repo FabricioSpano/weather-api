@@ -1,6 +1,5 @@
 require "digest"
 require "json"
-require "active_support/core_ext/string/filters"
 
 module Forecasts
   class Fetch
@@ -16,9 +15,9 @@ module Forecasts
       @cache = cache
     end
 
-    def call(address:, zipcode: nil, country: nil)
-      address = normalize_address(address)
+    def call(address: nil, zipcode: nil, country: nil)
       filters = Locations::Client.normalize_filters(zipcode:, country:)
+      address = Locations::Client.normalize_address(address, filters:)
       location = @cache.fetch(location_key(address, filters), expires_in: CACHE_TTL) do
         @locations.call(address:, **filters).to_h
       end
@@ -37,21 +36,8 @@ module Forecasts
 
     private
 
-    def normalize_address(address)
-      unless address.is_a?(String) && address.valid_encoding? && address.length <= 500
-        raise Locations::Client::InvalidAddressError, "Provide an address with at most 500 characters"
-      end
-
-      normalized = address.squish
-      if normalized.empty?
-        raise Locations::Client::InvalidAddressError, "Provide an address with at most 500 characters"
-      end
-
-      normalized
-    end
-
     def location_key(address, filters)
-      query = JSON.generate([ address.downcase, filters ])
+      query = JSON.generate([ address&.downcase, filters ])
       [ "locations", LOCATION_CACHE_VERSION, Digest::SHA256.hexdigest(query) ]
     end
 

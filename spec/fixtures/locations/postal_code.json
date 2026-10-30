@@ -1,0 +1,32 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_key": "place",
+        "osm_value": "postcode",
+        "type": "other",
+        "name": "SW1A 2AA",
+        "city": "Westminster",
+        "county": "Greater London",
+        "state": "England",
+        "country": "United Kingdom",
+        "countrycode": "GB",
+        "extent": [
+          -0.1377692623317672,
+          51.50977408582365,
+          -0.11762388102648702,
+          51.497201505225355
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -0.1276965,
+          51.5034878
+        ]
+      }
+    }
+  ]
+}

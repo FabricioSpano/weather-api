@@ -1,4 +1,5 @@
 require "geocoder"
+require "active_support/core_ext/string/filters"
 
 module Locations
   class Client
@@ -46,6 +47,19 @@ module Locations
       filters
     end
 
+    def self.normalize_address(address, filters:)
+      unless address.nil? || (address.is_a?(String) && address.valid_encoding? && address.length <= 500)
+        raise InvalidAddressError, "Provide an address with at most 500 characters"
+      end
+
+      normalized = address&.squish.presence
+      if normalized.nil? && !(filters[:zipcode] && filters[:country])
+        raise InvalidAddressError, "Provide an address or both zipcode and country"
+      end
+
+      normalized
+    end
+
     def initialize(endpoint: ENV.fetch("LOCATIONS_URL", DEFAULT_ENDPOINT))
       uri = URI(endpoint)
       unless %w[http https].include?(uri.scheme) && uri.host
@@ -55,18 +69,14 @@ module Locations
       @lookup = PhotonLookup.new(endpoint:, headers: { "Accept" => "application/json", "User-Agent" => USER_AGENT })
     end
 
-    def call(address:, zipcode: nil, country: nil)
-      unless address.is_a?(String) && address.valid_encoding? && !address.strip.empty? && address.length <= 500
-        raise InvalidAddressError, "Provide an address with at most 500 characters"
-      end
-
+    def call(address: nil, zipcode: nil, country: nil)
       filters = self.class.normalize_filters(zipcode:, country:)
-      query = Geocoder::Query.new(address.strip, lookup: :photon, street_address: true)
-      if query.reverse_geocode?
+      address = self.class.normalize_address(address, filters:)
+      if address && Geocoder::Query.new(address, lookup: :photon, street_address: true).reverse_geocode?
         raise InvalidAddressError, "Provide a street address instead of coordinates"
       end
 
-      search = [ address.strip, filters[:zipcode] ].compact.join(", ")
+      search = [ address, filters[:zipcode] ].compact.join(", ")
       query = Geocoder::Query.new(search, lookup: :photon, street_address: true,
         limit: CANDIDATE_LIMIT, language: "en", params: { countrycode: filters[:country] })
       results = @lookup.search(query).map { |result| [ result, candidate(result) ] }
@@ -107,7 +117,7 @@ module Locations
         street:, house_number: optional_text(fields["housenumber"]),
         city: optional_text(fields["city"]), state: optional_text(fields["state"]),
         country: optional_text(fields["country"]), country_code: optional_text(fields["countrycode"])&.upcase,
-        postal_code: optional_text(fields["postcode"])
+        postal_code: optional_text(postal_code(result))
       }
     end
 
@@ -123,9 +133,15 @@ module Locations
       value.strip.presence if value.is_a?(String)
     end
 
+    def postal_code(result)
+      fields = properties(result)
+      # Photon stores the code as the name for postal-area features.
+      result.postal_code || (fields["name"] if fields["osm_key"] == "place" && fields["osm_value"] == "postcode")
+    end
+
     def normalize(result)
       properties = properties(result)
-      postal_code = text(result.postal_code)
+      postal_code = text(postal_code(result))
       country = text(result.country)
       # Geocoder 1.8's Photon result does not expose the provider's countrycode.
       country_code = text(properties["countrycode"]).upcase

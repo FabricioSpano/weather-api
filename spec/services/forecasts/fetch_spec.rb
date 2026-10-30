@@ -101,6 +101,59 @@ RSpec.describe Forecasts::Fetch do
       expect(weather).to have_received(:call).once
     end
 
+    context "with postal code and country instead of an address" do
+      before do
+        allow(locations).to receive(:call).with(address: nil, zipcode: "SW1A2AA", country: "GB").and_return(location)
+      end
+
+      it "normalizes postal inputs and reuses their location and forecast" do
+        first = service.call(zipcode: "sw1a-2aa", country: "gb")
+        second = service.call(address: "  ", zipcode: "SW1A 2AA", country: "GB")
+
+        expect(first.cached).to be(false)
+        expect(second.cached).to be(true)
+        expect(locations).to have_received(:call).with(address: nil, zipcode: "SW1A2AA", country: "GB").once
+        expect(weather).to have_received(:call).once
+      end
+
+      it "shares forecasts with an address lookup without sharing the location key" do
+        lookup
+        result = service.call(zipcode: "SW1A2AA", country: "GB")
+
+        expect(result.cached).to be(true)
+        expect(locations).to have_received(:call).twice
+        expect(weather).to have_received(:call).once
+      end
+
+      it "validates postal fields before reading an existing cache entry" do
+        service.call(zipcode: "SW1A2AA", country: "GB")
+        expect(cache).not_to receive(:fetch)
+
+        expect { service.call(zipcode: "SW1A2AA") }.to raise_error(Locations::Client::InvalidAddressError)
+      end
+
+      it "expires postal lookups and forecasts after thirty minutes" do
+        travel_to(Time.utc(2026, 10, 30, 12)) do
+          service.call(zipcode: "SW1A2AA", country: "GB")
+          travel 30.minutes
+
+          expect(service.call(zipcode: "SW1A2AA", country: "GB").cached).to be(false)
+          expect(locations).to have_received(:call).twice
+          expect(weather).to have_received(:call).twice
+        end
+      end
+    end
+
+    [ {}, { zipcode: "SW1A2AA" }, { country: "GB" } ].each do |input|
+      it "rejects missing address and incomplete postal fields #{input.inspect} before accessing the cache" do
+        expect(cache).not_to receive(:fetch)
+
+        expect { service.call(**input) }.to raise_error(Locations::Client::InvalidAddressError)
+        expect(locations).not_to have_received(:call)
+        expect(weather).not_to have_received(:call)
+      end
+    end
+
     it "keeps different refinements of the same address isolated" do
       other_location = location.with(postal_code: "10001", country: "United States", country_code: "US",
         latitude: 40.75, longitude: -73.99)

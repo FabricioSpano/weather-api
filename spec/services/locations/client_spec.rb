@@ -209,6 +209,74 @@ RSpec.describe Locations::Client do
     end
   end
 
+  context "with only postal code and country" do
+    let(:payload) { JSON.parse(file_fixture("locations/postal_code.json").read) }
+    let(:query) { { q: "SW1A2AA", limit: "5", lang: "en", countrycode: "GB" } }
+
+    it "resolves a postal area using the provider's postcode feature name" do
+      location = client.call(zipcode: " sw1a-2aa ", country: "gb")
+
+      expect(location.to_h).to eq(
+        postal_code: "SW1A 2AA", country: "United Kingdom", country_code: "GB",
+        latitude: 51.5034878, longitude: -0.1276965
+      )
+      expect(provider_request).to have_been_requested.once
+    end
+
+    [ nil, "", " \n\t " ].each do |blank_address|
+      it "accepts blank address #{blank_address.inspect} with both postal fields" do
+        expect(client.call(address: blank_address, zipcode: "SW1A2AA", country: "GB").postal_code).to eq("SW1A 2AA")
+      end
+    end
+
+    it "preserves leading zeros when querying a numeric postal code" do
+      payload["features"][0]["properties"].merge!("name" => "00501", "country" => "United States", "countrycode" => "US")
+      request = stub_request(:get, endpoint)
+        .with(query: { q: "00501", limit: "5", lang: "en", countrycode: "US" }).to_return(body:)
+
+      expect(client.call(zipcode: "00501", country: "US").postal_code).to eq("00501")
+      expect(request).to have_been_requested.once
+    end
+
+    it "rejects fuzzy results for a different postal code" do
+      payload["features"][0]["properties"]["name"] = "SW1A 1AA"
+
+      expect { client.call(zipcode: "SW1A2AA", country: "GB") }.to raise_error(described_class::NotFoundError)
+    end
+
+    it "still returns candidates when more than one postal location matches" do
+      other = Marshal.load(Marshal.dump(payload["features"][0]))
+      other["geometry"]["coordinates"] = [ -0.12, 51.51 ]
+      payload["features"] << other
+
+      expect { client.call(zipcode: "SW1A2AA", country: "GB") }
+        .to raise_error(described_class::AmbiguousAddressError) do |error|
+          expect(error.candidates.map { |candidate| candidate[:postal_code] }).to eq([ "SW1A 2AA", "SW1A 2AA" ])
+        end
+    end
+
+    it "does not mistake an unrelated feature name for a postal code" do
+      payload["features"][0]["properties"]["osm_value"] = "city"
+
+      expect { client.call(zipcode: "SW1A2AA", country: "GB") }.to raise_error(described_class::InvalidResponseError)
+    end
+
+    [ 42, false, [], {}, "a" * 501, "\xff".force_encoding("UTF-8") ].each do |invalid_address|
+      it "rejects malformed address #{invalid_address.inspect} even with both postal fields" do
+        expect { client.call(address: invalid_address, zipcode: "SW1A2AA", country: "GB") }
+          .to raise_error(described_class::InvalidAddressError)
+        expect(provider_request).not_to have_been_requested
+      end
+    end
+  end
+
+  [ {}, { zipcode: "SW1A2AA" }, { country: "GB" } ].each do |input|
+    it "requires both postal fields when address is absent: #{input.inspect}" do
+      expect { client.call(**input) }.to raise_error(described_class::InvalidAddressError, /address or both/)
+      expect(provider_request).not_to have_been_requested
+    end
+  end
+
   context "with only a country refinement" do
     let(:query) { super().merge(countrycode: "GB") }
 

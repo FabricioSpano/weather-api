@@ -1,6 +1,6 @@
 # Weather API
 
-Rails API that accepts an international address and returns the current temperature
+Rails API that accepts an international address or a postal code and country, and returns the current temperature
 and a seven-day forecast in Celsius. Forecasts are cached by country and postal
 code for 30 minutes, with an indicator showing whether the forecast came from cache.
 
@@ -56,11 +56,20 @@ Example response with illustrative weather values:
 postal code return `true` while the entry remains cached. Responses use
 `Cache-Control: no-store` so HTTP caches do not reuse an outdated cache indicator.
 
-`address` is required and must be a nonblank string of at most 500 characters.
-Include street number, city and country. Optional refinements are `zipcode`
-(a string of up to 32 characters) and `country` (a two-letter code such as `BR`
-or `GB`). Postal codes preserve leading zeros; spaces, hyphens and letter case
-are normalized. Each filter can be used independently.
+Provide either `address` or both `zipcode` and `country`. An address must be a
+string of at most 500 characters; include street number, city and country.
+`zipcode` is a string of up to 32 characters, and `country` is a two-letter code
+such as `BR` or `GB`. Postal codes preserve leading zeros; spaces, hyphens and
+letter case are normalized. With an address, either field can refine the search.
+Without an address (or with a blank one), both postal fields are required.
+
+```sh
+curl --get 'http://localhost:3000/forecast' \
+  --data-urlencode 'zipcode=SW1A 2AA' --data-urlencode 'country=GB'
+```
+
+Postal-only searches resolve coordinates for the postal area rather than a
+specific street address. Availability depends on the provider's postal data.
 
 ```sh
 curl --get 'http://localhost:3000/forecast' \
@@ -91,7 +100,7 @@ Errors use this format:
 Filters are checked against provider results. No match returns `422 address_not_found`;
 multiple remaining locations still return ambiguity, even within the same postal
 area. A candidate without a house number does not confirm that specific number.
-Invalid filters return `422 invalid_address`; `address` remains required.
+Invalid inputs or a missing address without both postal fields return `422 invalid_address`.
 
 | HTTP status | Error codes |
 | --- | --- |
@@ -105,7 +114,7 @@ Invalid filters return `422 invalid_address`; `address` remains required.
 | Component | Responsibility |
 | --- | --- |
 | `ForecastsController` | Receive parameters and return JSON with the appropriate HTTP status |
-| `Locations::Client` | Resolve the address through Geocoder and Photon; validate postal code, country and coordinates |
+| `Locations::Client` | Resolve an address or postal area through Geocoder and Photon; validate postal code, country and coordinates |
 | `Weather::Client` | Query Open-Meteo through its Ruby SDK and validate the forecast |
 | `Forecasts::Fetch` | Coordinate location lookup, forecast retrieval and caching |
 
@@ -139,8 +148,8 @@ Reads do not extend that lifetime, and only successful results are cached.
 | Location | `locations/v2/<SHA-256 of normalized address and filters>` |
 | Forecast | `forecasts/v1/<country code>/<normalized postal code>` |
 
-Location keys include the normalized refinements so one query cannot reuse a
-location resolved under different filters. Address keys ignore case and repeated
+Location keys include the normalized refinements and a null address for postal-only
+queries, so one query cannot reuse a location resolved under different filters. Address keys ignore case and repeated
 whitespace. Postal codes remain strings,
 with spaces and hyphens removed and letters uppercased; the country prevents
 collisions between countries. The first resolved address supplies the coordinates

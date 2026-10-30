@@ -176,12 +176,69 @@ RSpec.describe "Forecasts", type: :request do
       end
     end
 
-    it "requires an address even when postal code and country are supplied" do
-      get "/forecast", params: { zipcode: "10001", country: "US" }
+    context "with only postal code and country" do
+      let(:postal_request) do
+        stub_request(:get, "https://photon.komoot.io/api/")
+          .with(query: { q: "SW1A2AA", lang: "en", limit: "5", countrycode: "GB" })
+          .to_return(body: file_fixture("locations/postal_code.json").read)
+      end
 
-      expect(response).to have_http_status(422)
-      expect(location_request).not_to have_been_requested
-      expect(weather_request).not_to have_been_requested
+      before { postal_request }
+
+      it "returns a forecast and caches equivalent postal queries" do
+        get "/forecast", params: { zipcode: "SW1A 2AA", country: "gb" }
+
+        expect(response).to have_http_status(200)
+        expect(response.parsed_body).to include("postal_code" => "SW1A 2AA", "country_code" => "GB", "cached" => false)
+
+        get "/forecast", params: { address: "  ", zipcode: "sw1a-2aa", country: "GB" }
+
+        expect(response).to have_http_status(200)
+        expect(response.parsed_body.fetch("cached")).to be(true)
+        expect(postal_request).to have_been_requested.once
+        expect(location_request).not_to have_been_requested
+        expect(weather_request).to have_been_requested.once
+      end
+
+      it "returns 422 for an unknown postal code without consulting weather" do
+        stub_request(:get, "https://photon.komoot.io/api/")
+          .with(query: { q: "SW1A2AA", lang: "en", limit: "5", countrycode: "GB" })
+          .to_return(body: JSON.generate(type: "FeatureCollection", features: []))
+
+        get "/forecast", params: { zipcode: "SW1A2AA", country: "GB" }
+
+        expect(response).to have_http_status(422)
+        expect(response.parsed_body.dig("error", "code")).to eq("address_not_found")
+        expect(weather_request).not_to have_been_requested
+      end
+
+      it "preserves the upstream timeout response for a postal lookup" do
+        stub_request(:get, "https://photon.komoot.io/api/")
+          .with(query: { q: "SW1A2AA", lang: "en", limit: "5", countrycode: "GB" })
+          .to_raise(Net::ReadTimeout)
+
+        get "/forecast", params: { zipcode: "SW1A2AA", country: "GB" }
+
+        expect(response).to have_http_status(504)
+        expect(response.parsed_body.dig("error", "code")).to eq("upstream_timeout")
+        expect(weather_request).not_to have_been_requested
+      end
+    end
+
+    [
+      { zipcode: "10001" }, { country: "US" }, { zipcode: "", country: "US" },
+      { zipcode: "10001", country: "" }, { zipcode: [ "10001" ], country: "US" },
+      { zipcode: "10001", country: { code: "US" } }, { address: [ "London" ], zipcode: "SW1A2AA", country: "GB" }
+    ].each do |input|
+      it "rejects missing or invalid postal fields without an address: #{input.inspect}" do
+        get "/forecast", params: input
+
+        expect(response).to have_http_status(422)
+        expect(response.parsed_body.dig("error", "code")).to eq("invalid_address")
+        expect(location_request).not_to have_been_requested
+        expect(weather_request).not_to have_been_requested
+        expect(WebMock).not_to have_requested(:get, /photon/)
+      end
     end
 
     context "when no location matches" do
