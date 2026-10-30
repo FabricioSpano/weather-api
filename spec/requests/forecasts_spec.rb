@@ -9,7 +9,7 @@ RSpec.describe "Forecasts", type: :request do
   let(:weather_payload) { file_fixture("weather/success.json").read }
   let(:location_request) do
     stub_request(:get, "https://photon.komoot.io/api/")
-      .with(query: { q: address, lang: "en", limit: "2" })
+      .with(query: { q: address, lang: "en", limit: "5" })
       .to_return { { body: location_payload } }
   end
   let(:weather_request) do
@@ -94,8 +94,94 @@ RSpec.describe "Forecasts", type: :request do
         expect(response).to have_http_status(422)
         expect(response.parsed_body.dig("error", "code")).to eq("ambiguous_address")
         expect(response.parsed_body.dig("error", "message")).to include("city, region and country")
+        expect(response.parsed_body.dig("error", "candidates").first).to include(
+          "street" => nil, "city" => "Springfield", "state" => "Massachusetts",
+          "country" => "United States", "country_code" => "US", "postal_code" => nil
+        )
         expect(weather_request).not_to have_been_requested
       end
+    end
+
+    context "when refining an ambiguous address" do
+      let(:address) { "1000 Caramuru, Ribeirão Preto, SP, Brasil" }
+      let(:location_payload) { file_fixture("locations/caramuru.json").read }
+      let(:weather_request) do
+        stub_request(:get, "https://api.open-meteo.com/v1/forecast")
+          .with(query: hash_including(latitude: "-21.1906117", longitude: "-47.8206526"))
+          .to_return(body: weather_payload)
+      end
+
+      it "returns candidates, accepts explicit refinements, and caches only the resolved query" do
+        resolved = JSON.parse(location_payload)
+        resolved["features"] = resolved["features"].take(1)
+        refined_request = stub_request(:get, "https://photon.komoot.io/api/")
+          .with(query: { q: "#{address}, 14025119", lang: "en", limit: "5", countrycode: "BR" })
+          .to_return(body: JSON.generate(resolved))
+
+        get "/forecast", params: { address: }
+
+        expect(response).to have_http_status(422)
+        expect(response.parsed_body.dig("error", "candidates").length).to eq(5)
+        expect(response.parsed_body.dig("error", "candidates").first).to include(
+          "street" => "Avenida Caramuru", "city" => "Ribeirão Preto", "country" => "Brazil",
+          "country_code" => "BR", "postal_code" => "14025-119"
+        )
+        expect(weather_request).not_to have_been_requested
+
+        get "/forecast", params: { address:, zipcode: "14025-119", country: "br" }
+
+        expect(response).to have_http_status(200)
+        expect(response.parsed_body).to include("postal_code" => "14025-119", "country_code" => "BR", "cached" => false)
+
+        get "/forecast", params: { address:, zipcode: "14025119", country: "BR" }
+
+        expect(response).to have_http_status(200)
+        expect(response.parsed_body.fetch("cached")).to be(true)
+        expect(refined_request).to have_been_requested.once
+        expect(weather_request).to have_been_requested.once
+
+        get "/forecast", params: { address: }
+
+        expect(response).to have_http_status(422)
+        expect(location_request).to have_been_requested.twice
+        expect(weather_request).to have_been_requested.once
+      end
+
+      it "still returns 422 when the refined provider response contains multiple locations" do
+        refined_request = stub_request(:get, "https://photon.komoot.io/api/")
+          .with(query: { q: "#{address}, 14025119", lang: "en", limit: "5", countrycode: "BR" })
+          .to_return(body: file_fixture("locations/caramuru_refined.json").read)
+
+        get "/forecast", params: { address:, zipcode: "14025-119", country: "BR" }
+
+        expect(response).to have_http_status(422)
+        expect(response.parsed_body.dig("error", "code")).to eq("ambiguous_address")
+        expect(response.parsed_body.dig("error", "candidates").length).to eq(2)
+        expect(refined_request).to have_been_requested.once
+        expect(weather_request).not_to have_been_requested
+      end
+    end
+
+    [
+      { zipcode: "" }, { zipcode: "---" }, { zipcode: [ "10001" ] }, { zipcode: { code: "10001" } },
+      { country: "Brazil" }, { country: [ "BR" ] }, { country: { code: "BR" } }
+    ].each do |filters|
+      it "returns 422 for invalid refinements #{filters.inspect} without calling providers" do
+        get "/forecast", params: { address:, **filters }
+
+        expect(response).to have_http_status(422)
+        expect(response.parsed_body.dig("error", "code")).to eq("invalid_address")
+        expect(location_request).not_to have_been_requested
+        expect(weather_request).not_to have_been_requested
+      end
+    end
+
+    it "requires an address even when postal code and country are supplied" do
+      get "/forecast", params: { zipcode: "10001", country: "US" }
+
+      expect(response).to have_http_status(422)
+      expect(location_request).not_to have_been_requested
+      expect(weather_request).not_to have_been_requested
     end
 
     context "when no location matches" do
@@ -171,7 +257,7 @@ RSpec.describe "Forecasts", type: :request do
       [ Weather::Client::UnavailableError, 503, "upstream_unavailable" ]
     ].each do |error_class, status, code|
       it "maps #{error_class} to HTTP #{status}" do
-        allow(service).to receive(:call).with(address:).and_raise(error_class, "Safe domain error")
+        allow(service).to receive(:call).with(address:, zipcode: nil, country: nil).and_raise(error_class, "Safe domain error")
 
         get "/forecast", params: { address: }
 

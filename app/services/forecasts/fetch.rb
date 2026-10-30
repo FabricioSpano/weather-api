@@ -1,4 +1,5 @@
 require "digest"
+require "json"
 require "active_support/core_ext/string/filters"
 
 module Forecasts
@@ -7,6 +8,7 @@ module Forecasts
 
     CACHE_TTL = 30.minutes
     CACHE_VERSION = "v1".freeze
+    LOCATION_CACHE_VERSION = "v2".freeze
 
     def initialize(locations: Locations::Client.new, weather: Weather::Client.new, cache: Rails.cache)
       @locations = locations
@@ -14,10 +16,11 @@ module Forecasts
       @cache = cache
     end
 
-    def call(address:)
+    def call(address:, zipcode: nil, country: nil)
       address = normalize_address(address)
-      location = @cache.fetch(location_key(address), expires_in: CACHE_TTL) do
-        @locations.call(address:).to_h
+      filters = Locations::Client.normalize_filters(zipcode:, country:)
+      location = @cache.fetch(location_key(address, filters), expires_in: CACHE_TTL) do
+        @locations.call(address:, **filters).to_h
       end
 
       cached = true
@@ -47,8 +50,9 @@ module Forecasts
       normalized
     end
 
-    def location_key(address)
-      [ "locations", CACHE_VERSION, Digest::SHA256.hexdigest(address.downcase) ]
+    def location_key(address, filters)
+      query = JSON.generate([ address.downcase, filters ])
+      [ "locations", LOCATION_CACHE_VERSION, Digest::SHA256.hexdigest(query) ]
     end
 
     def forecast_key(location)

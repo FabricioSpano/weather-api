@@ -78,9 +78,60 @@ RSpec.describe Forecasts::Fetch do
       expect(weather).to have_received(:call).once
     end
 
+    it "does not reuse an unrefined location for a refined request, but shares its postal forecast" do
+      allow(locations).to receive(:call).with(address:, zipcode: "SW1A2AA", country: "GB").and_return(location)
+
+      lookup
+      result = service.call(address:, zipcode: "SW1A 2AA", country: "GB")
+
+      expect(result.cached).to be(true)
+      expect(locations).to have_received(:call).with(address:).once
+      expect(locations).to have_received(:call).with(address:, zipcode: "SW1A2AA", country: "GB").once
+      expect(weather).to have_received(:call).once
+    end
+
+    it "shares a location cache entry between equivalent refinement formats" do
+      allow(locations).to receive(:call).with(address:, zipcode: "SW1A2AA", country: "GB").and_return(location)
+
+      service.call(address:, zipcode: " sw1a-2aa ", country: " gb ")
+      result = service.call(address: address.upcase, zipcode: "SW1A 2AA", country: "GB")
+
+      expect(result.cached).to be(true)
+      expect(locations).to have_received(:call).once
+      expect(weather).to have_received(:call).once
+    end
+
+    it "keeps different refinements of the same address isolated" do
+      other_location = location.with(postal_code: "10001", country: "United States", country_code: "US",
+        latitude: 40.75, longitude: -73.99)
+      allow(locations).to receive(:call).with(address:, zipcode: "SW1A2AA", country: "GB").and_return(location)
+      allow(locations).to receive(:call).with(address:, zipcode: "10001", country: "US").and_return(other_location)
+      allow(weather).to receive(:call).with(latitude: other_location.latitude, longitude: other_location.longitude)
+        .and_return(forecast)
+
+      service.call(address:, zipcode: "SW1A2AA", country: "GB")
+      result = service.call(address:, zipcode: "10001", country: "US")
+
+      expect(result.country_code).to eq("US")
+      expect(result.postal_code).to eq("10001")
+      expect(result.cached).to be(false)
+      expect(locations).to have_received(:call).twice
+      expect(weather).to have_received(:call).twice
+    end
+
+    [ { zipcode: [] }, { country: "Brazil" }, { zipcode: "---" } ].each do |filters|
+      it "validates refinements #{filters.inspect} before accessing the cache" do
+        expect(cache).not_to receive(:fetch)
+
+        expect { service.call(address:, **filters) }.to raise_error(Locations::Client::InvalidAddressError)
+        expect(locations).not_to have_received(:call)
+        expect(weather).not_to have_received(:call)
+      end
+    end
+
     it "uses an address digest instead of including a raw street address in cache keys" do
       expect(cache).to receive(:fetch).with(
-        [ "locations", "v1", Digest::SHA256.hexdigest(address.downcase) ], expires_in: 30.minutes
+        [ "locations", "v2", Digest::SHA256.hexdigest(JSON.generate([ address.downcase, {} ])) ], expires_in: 30.minutes
       ).and_call_original
       allow(cache).to receive(:fetch).with([ "forecasts", "v1", "GB", "SW1A2AA" ], expires_in: 30.minutes).and_call_original
 
@@ -276,7 +327,7 @@ RSpec.describe Forecasts::Fetch do
     let(:weather_payload) { file_fixture("weather/success.json").read }
     let(:location_request) do
       stub_request(:get, "https://photon.komoot.io/api/")
-        .with(query: { q: address, lang: "en", limit: "2" })
+        .with(query: { q: address, lang: "en", limit: "5" })
         .to_return(body: location_payload)
     end
     let(:weather_query) do

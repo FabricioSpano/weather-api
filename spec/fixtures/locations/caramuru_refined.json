@@ -1,0 +1,90 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 834686906,
+        "osm_key": "highway",
+        "osm_value": "secondary",
+        "type": "street",
+        "name": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14025-119",
+        "countrycode": "BR",
+        "extent": [
+          -47.8213418,
+          -21.1886667,
+          -47.8198129,
+          -21.1926667
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.8206526,
+          -21.1906117
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "N",
+        "osm_id": 1827560841,
+        "osm_key": "highway",
+        "osm_value": "bus_stop",
+        "type": "house",
+        "name": "Avenida Caramuru",
+        "street": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14025-119",
+        "countrycode": "BR"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.8206528,
+          -21.1903158
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 973593649,
+        "osm_key": "highway",
+        "osm_value": "secondary",
+        "type": "street",
+        "name": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14025-080",
+        "countrycode": "BR",
+        "extent": [
+          -47.8190561,
+          -21.1846642,
+          -47.818844,
+          -21.1850742
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.81895,
+          -21.1848692
+        ]
+      }
+    }
+  ]
+}

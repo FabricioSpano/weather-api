@@ -10,7 +10,7 @@ class ForecastsController < ApplicationController
   end
 
   rescue_from Locations::Client::AmbiguousAddressError do |error|
-    render_error(error, code: "ambiguous_address", status: 422)
+    render_error(error, code: "ambiguous_address", status: 422, candidates: error.candidates)
   end
 
   rescue_from Weather::Client::InvalidCoordinatesError do |error|
@@ -34,13 +34,15 @@ class ForecastsController < ApplicationController
   end
 
   def show
-    result = Forecasts::Fetch.new.call(address: params[:address])
+    result = Forecasts::Fetch.new.call(address: params[:address], zipcode: params[:zipcode], country: params[:country])
     render json: result.to_h
   end
 
   private
 
-  def render_error(error, code:, status:)
-    render json: { error: { code:, message: error.message } }, status:
+  def render_error(error, code:, status:, candidates: nil)
+    details = { code:, message: error.message }
+    details[:candidates] = candidates if candidates.present?
+    render json: { error: details }, status:
   end
 end

@@ -56,15 +56,42 @@ Example response with illustrative weather values:
 postal code return `true` while the entry remains cached. Responses use
 `Cache-Control: no-store` so HTTP caches do not reuse an outdated cache indicator.
 
-`address` must be a nonblank string of at most 500 characters. Include street
-number, city and country. Multiple location matches return `422 ambiguous_address`
-and require more details; the API never silently chooses the first candidate.
+`address` is required and must be a nonblank string of at most 500 characters.
+Include street number, city and country. Optional refinements are `zipcode`
+(a string of up to 32 characters) and `country` (a two-letter code such as `BR`
+or `GB`). Postal codes preserve leading zeros; spaces, hyphens and letter case
+are normalized. Each filter can be used independently.
+
+```sh
+curl --get 'http://localhost:3000/forecast' \
+  --data-urlencode 'address=10 Downing Street, London, United Kingdom' \
+  --data-urlencode 'zipcode=SW1A 2AA' --data-urlencode 'country=GB'
+```
+
+Multiple matches return `422 ambiguous_address` with up to five candidates,
+including street, house number, city, state, country and postal code. Missing
+fields are `null`. Refine the address or supply the known postal/country codes
+as `zipcode` and `country`; the API never silently chooses the first candidate.
 
 Errors use this format:
 
 ```json
-{"error":{"code":"ambiguous_address","message":"Address is ambiguous; include street number, city, region and country"}}
+{
+  "error": {
+    "code": "ambiguous_address",
+    "message": "Address is ambiguous; include street number, city, region and country, or refine with zipcode and country",
+    "candidates": [
+      { "street": "Avenida Caramuru", "house_number": null, "city": "Ribeirão Preto", "state": "São Paulo", "country": "Brazil", "country_code": "BR", "postal_code": "14025-119" },
+      { "street": "Avenida Caramuru", "house_number": null, "city": "Ribeirão Preto", "state": "São Paulo", "country": "Brazil", "country_code": "BR", "postal_code": "14025-060" }
+    ]
+  }
+}
 ```
+
+Filters are checked against provider results. No match returns `422 address_not_found`;
+multiple remaining locations still return ambiguity, even within the same postal
+area. A candidate without a house number does not confirm that specific number.
+Invalid filters return `422 invalid_address`; `address` remains required.
 
 | HTTP status | Error codes |
 | --- | --- |
@@ -109,10 +136,12 @@ Reads do not extend that lifetime, and only successful results are cached.
 
 | Entry | Key within the environment namespace |
 | --- | --- |
-| Location | `locations/v1/<SHA-256 of normalized address>` |
+| Location | `locations/v2/<SHA-256 of normalized address and filters>` |
 | Forecast | `forecasts/v1/<country code>/<normalized postal code>` |
 
-Address keys ignore case and repeated whitespace. Postal codes remain strings,
+Location keys include the normalized refinements so one query cannot reuse a
+location resolved under different filters. Address keys ignore case and repeated
+whitespace. Postal codes remain strings,
 with spaces and hyphens removed and letters uppercased; the country prevents
 collisions between countries. The first resolved address supplies the coordinates
 for that postal area's cached forecast. A different address in the same postal

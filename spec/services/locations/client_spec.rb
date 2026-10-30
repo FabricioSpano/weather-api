@@ -9,7 +9,7 @@ RSpec.describe Locations::Client do
   let(:payload) { JSON.parse(file_fixture("locations/success.json").read) }
   let(:body) { JSON.generate(payload) }
   let(:status) { 200 }
-  let(:query) { { q: address, limit: "2", lang: "en" } }
+  let(:query) { { q: address, limit: "5", lang: "en" } }
   let(:provider_request) do
     stub_request(:get, endpoint)
       .with(query:,
@@ -145,10 +145,109 @@ RSpec.describe Locations::Client do
       expect { lookup }.to raise_error(described_class::AmbiguousAddressError, /city, region and country/)
     end
 
+    it "provides address fields for the caller to refine, with nil for missing postal data" do
+      expect { lookup }.to raise_error(described_class::AmbiguousAddressError) do |error|
+        expect(error.candidates.first).to eq(
+          street: nil, house_number: nil, city: "Springfield", state: "Massachusetts",
+          country: "United States", country_code: "US", postal_code: nil
+        )
+        expect(error.candidates.length).to eq(2)
+      end
+    end
+
     it "still rejects ambiguity if only one of the candidates has a postal code" do
       payload["features"][0]["properties"]["postcode"] = "01103"
 
       expect { lookup }.to raise_error(described_class::AmbiguousAddressError)
+    end
+  end
+
+  context "with postal and country refinements" do
+    let(:address) { "1000 Caramuru, Ribeirão Preto, SP, Brasil" }
+    let(:payload) { JSON.parse(file_fixture("locations/caramuru.json").read) }
+    let(:query) { { q: "#{address}, 14025119", limit: "5", lang: "en", countrycode: "BR" } }
+
+    it "filters all returned results rather than choosing the first candidate" do
+      payload["features"].reverse!
+
+      location = client.call(address:, zipcode: "14025-119", country: " br ")
+
+      expect(location.postal_code).to eq("14025-119")
+      expect(location.country_code).to eq("BR")
+      expect(location.latitude).to eq(-21.1906117)
+      expect(location.longitude).to eq(-47.8206526)
+      expect(provider_request).to have_been_requested.once
+    end
+
+    it "returns not found when the supplied postal code excludes every result" do
+      payload["features"].shift
+
+      expect { client.call(address:, zipcode: "14025119", country: "BR") }
+        .to raise_error(described_class::NotFoundError)
+    end
+
+    it "does not discard an unresolved candidate whose postal metadata is missing" do
+      payload["features"][1]["properties"].delete("postcode")
+
+      expect { client.call(address:, zipcode: "14025119", country: "BR") }
+        .to raise_error(described_class::AmbiguousAddressError) do |error|
+          expect(error.candidates.map { |candidate| candidate[:postal_code] }).to eq([ "14025-119", nil ])
+        end
+    end
+
+    context "when distinct locations remain within the supplied postal area" do
+      let(:payload) { JSON.parse(file_fixture("locations/caramuru_refined.json").read) }
+
+      it "continues to return ambiguity and includes only candidates not ruled out by the filters" do
+        expect { client.call(address:, zipcode: "14025119", country: "BR") }
+          .to raise_error(described_class::AmbiguousAddressError) do |error|
+            expect(error.candidates.length).to eq(2)
+            expect(error.candidates.map { |candidate| candidate[:postal_code] }.uniq).to eq([ "14025-119" ])
+            expect(error.candidates.first[:street]).to eq("Avenida Caramuru")
+          end
+      end
+    end
+  end
+
+  context "with only a country refinement" do
+    let(:query) { super().merge(countrycode: "GB") }
+
+    it "sends the country restriction to Photon" do
+      expect(client.call(address:, country: "gb").country_code).to eq("GB")
+      expect(provider_request).to have_been_requested.once
+    end
+
+    it "checks the country even if the provider ignores the restriction" do
+      payload["features"][0]["properties"]["countrycode"] = "US"
+
+      expect { client.call(address:, country: "GB") }.to raise_error(described_class::NotFoundError)
+    end
+  end
+
+  context "with only a postal refinement" do
+    let(:query) { super().merge(q: "#{address}, SW1A2AA") }
+
+    it "accepts international postal codes and normalizes their formatting" do
+      expect(client.call(address:, zipcode: " sw1a-2aa ").postal_code).to eq("SW1A 2AA")
+      expect(provider_request).to have_been_requested.once
+    end
+
+    it "still rejects coordinate input before appending the postal code" do
+      expect { client.call(address: "51.5034878, -0.1276965", zipcode: "SW1A2AA") }
+        .to raise_error(described_class::InvalidAddressError)
+      expect(provider_request).not_to have_been_requested
+    end
+  end
+
+  {
+    zipcode: [ "", "   ", "---", "12/34", "a" * 33, 42, false, [], {}, "\xff".force_encoding("UTF-8") ],
+    country: [ "", "   ", "Brazil", "B", "B-R", "a" * 33, 42, false, [], {}, "\xff".force_encoding("UTF-8") ]
+  }.each do |field, values|
+    values.each do |value|
+      it "rejects invalid #{field} #{value.inspect} before making an HTTP request" do
+        expect { client.call(address:, **{ field => value }) }.to raise_error(described_class::InvalidAddressError)
+        expect(provider_request).not_to have_been_requested
+      end
     end
   end
 

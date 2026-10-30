@@ -1,0 +1,155 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 834686906,
+        "osm_key": "highway",
+        "osm_value": "secondary",
+        "type": "street",
+        "name": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14025-119",
+        "countrycode": "BR",
+        "extent": [
+          -47.8213418,
+          -21.1886667,
+          -47.8198129,
+          -21.1926667
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.8206526,
+          -21.1906117
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 974096240,
+        "osm_key": "highway",
+        "osm_value": "secondary",
+        "type": "street",
+        "name": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14025-060",
+        "countrycode": "BR",
+        "extent": [
+          -47.8200729,
+          -21.1878416,
+          -47.8200457,
+          -21.188391
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.8200593,
+          -21.1881163
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 974100268,
+        "osm_key": "highway",
+        "osm_value": "secondary",
+        "type": "street",
+        "name": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14026-282",
+        "countrycode": "BR",
+        "extent": [
+          -47.8230171,
+          -21.1997313,
+          -47.8229652,
+          -21.2009646
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.8229657,
+          -21.2003463
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 974450077,
+        "osm_key": "highway",
+        "osm_value": "secondary",
+        "type": "street",
+        "name": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14025-080",
+        "countrycode": "BR",
+        "extent": [
+          -47.818844,
+          -21.1836306,
+          -47.8182972,
+          -21.1846642
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.818569,
+          -21.1841483
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "osm_type": "W",
+        "osm_id": 171778115,
+        "osm_key": "highway",
+        "osm_value": "secondary",
+        "type": "street",
+        "name": "Avenida Caramuru",
+        "district": "Alto da Boa Vista",
+        "city": "Ribeirão Preto",
+        "state": "São Paulo",
+        "country": "Brazil",
+        "postcode": "14030-000",
+        "countrycode": "BR",
+        "extent": [
+          -47.8227322,
+          -21.1952078,
+          -47.8226966,
+          -21.1953183
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -47.8227193,
+          -21.1952646
+        ]
+      }
+    }
+  ]
+}
